@@ -3,7 +3,7 @@ import "./App.css";
 
 function App() {
   return (
-    <main className="flex h-screen flex-col items-center bg-cover bg-[url('bg.svg')] justify-center mx-auto">
+    <main className="flex h-screen flex-col items-center bg-cover bg-[url('landingpage-bg.svg')] justify-center mx-auto">
       <img
         src={DogLogo}
         className="logo"
