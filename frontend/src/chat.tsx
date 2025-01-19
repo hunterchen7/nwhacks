@@ -5,6 +5,7 @@ import Filler from "/filler.png";
 import Emotion from "/emotion.png";
 import Pacing from "/pace.png";
 import Volume from "/volume.png";
+import AudioTrans from "/audiotrans.png";
 
 
 interface Presentation {
@@ -208,7 +209,15 @@ const Chat: React.FC = () => {
       {/* Waveform Placeholder */}
       <div className="w-full h-[50px] bg-[#D7DAC7] rounded-md mb-4 flex justify-center items-center">
         {/* Replace this with an audio waveform image or a player */}
-        <p className="text-[#5A6E58]">[Waveform Placeholder]</p>
+
+        <img
+        src={AudioTrans}
+        className="audiotrans"
+        alt="audio"
+        width={800}
+        height={276}
+  />
+
       </div>
       {/* Controls */}
       <div className="flex items-center justify-between w-full">
@@ -230,11 +239,7 @@ const Chat: React.FC = () => {
       <div className="flex items-start gap-4">
         {/* Audio Icon */}
         <div className="flex flex-col items-center">
-          <img
-            src="/path/to/audio-icon.png"
-            alt="Audio icon"
-            className="w-[40px] h-[40px]"
-          />
+
           <p className="text-[#5A6E58] text-[14px]">0:23</p>
         </div>
         {/* Description */}
@@ -247,7 +252,7 @@ const Chat: React.FC = () => {
         </div>
       </div>
       {/* Suggestions */}
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex gap-2 pl-[40px]">
         <button className="bg-[#A4B494] text-white text-[14px] px-4 py-2 rounded-md">
           Create an energetic tone
         </button>
