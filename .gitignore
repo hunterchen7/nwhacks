@@ -1,2 +1,5 @@
 
 /backend/transcriptions
+/backend/uploads
+/backend/pretrained_models
+/backend/wav2vec2_checkpoints
