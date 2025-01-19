@@ -4,3 +4,6 @@
 /backend/pretrained_models
 /backend/wav2vec2_checkpoints
 /backend/old_transcriptions
+/backend/__pycache__
+/backend/__pycache__
+*.pyc
