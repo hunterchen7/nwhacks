@@ -4,6 +4,7 @@ import ArrowIcon from "/arrow-icon.png";
 import { LoadingModal } from "./loadingModal";
 import { Feedback } from "./feedback";
 import Review from "./review";
+import Dropzone from "react-dropzone";
 
 export interface Presentation {
   file_name: string;
@@ -38,12 +39,6 @@ const Chat: React.FC = () => {
     useState<Presentation | null>(null);
   const [presentationList, setPresentationList] = useState<Presentation[]>([]);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
-      setFile(event.target.files[0]);
-    }
-  };
 
   const presentationContains = (presentation: Presentation) => {
     return openPresentations.some(
@@ -268,7 +263,7 @@ const Chat: React.FC = () => {
       {/* New div for File Input, Upload Button, Display Results with background */}
       {!focusedPresentation ? (
         <div className="absolute right-0 top-0 h-full w-[378px] bg-[#558066] flex flex-col items-center justify-start pt-8 pr-3 rounded-tl-[30px] rounded-bl-[30px]">
-          <div className="mb-[20px] w-[82%] h-[80%] bg-[#6E977D] outline outline-4 outline-dotted outline-white rounded-[10px] flex flex-col justify-center items-center">
+          {/*<div className="mb-[20px] w-[82%] h-[80%] bg-[#6E977D] outline outline-4 outline-dotted outline-white rounded-[10px] flex flex-col justify-center items-center">
             <img
               src={ArrowIcon}
               className="Arrow icon"
@@ -279,15 +274,46 @@ const Chat: React.FC = () => {
             <h3 className="text-center pt-[20px] text-white text-[16px] mb-4 font-normal">
               Drag & drop <br></br> your pitch here
             </h3>
-          </div>
+          </div>*/}
 
-          {/* File Input */}
-          <input
-            type="file"
-            accept=".wav"
-            onChange={handleFileChange}
-            className="mb-4"
-          />
+          <Dropzone
+            onDrop={(acceptedFiles) => setFile(acceptedFiles[0])}
+            accept={{ "audio/wav": [".wav"] }}
+          >
+            {({ getRootProps, getInputProps, isDragAccept, isDragReject }) => (
+              <div
+                {...getRootProps()}
+                className={`mb-[20px] w-[82%] h-[80%] rounded-[10px] flex flex-col justify-center items-center transition-all 
+      outline outline-4 outline-dotted 
+      ${
+        isDragAccept
+          ? "bg-green-600 outline-green-400"
+          : isDragReject
+          ? "bg-red-500 outline-red-400"
+          : "bg-[#6E977D] outline-white"
+      } hover:bg-[#5C816B] hover:scale-102.5 hover:shadow-lg cursor-pointer`}
+              >
+                <input {...getInputProps()} />
+                <img
+                  src={ArrowIcon}
+                  className="Arrow icon"
+                  alt="arrow icon"
+                  width={80}
+                  height={80}
+                />
+                <h3 className="text-center pt-[20px] text-white text-[16px] mb-4 font-normal">
+                  {isDragReject
+                    ? "Unsupported file. Please upload a .wav file."
+                    : "Drag & drop your pitch here"}
+                </h3>
+                {file && (
+                  <p className="text-white text-[16px] font-medium animate-fade-in">
+                    {file.name}
+                  </p>
+                )}
+              </div>
+            )}
+          </Dropzone>
 
           {/* Upload Button */}
           <button
@@ -295,7 +321,7 @@ const Chat: React.FC = () => {
             disabled={!file || isLoading}
             className="bg-black rounded-lg m-6 px-8 py-3 text-white text-[18px] hover:bg-slate-700 transition-all cursor-pointer"
           >
-            Upload .wav file
+            Upload
           </button>
         </div>
       ) : (
