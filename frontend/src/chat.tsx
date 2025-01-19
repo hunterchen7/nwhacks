@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import DogHome from "/dog_home.gif";
 import ArrowIcon from "/arrow-icon.png";
+import Filler from "/filler.png";
+import Emotion from "/emotion.png";
+import Pacing from "/pace.png";
+import Volume from "/volume.png";
+
 
 interface Presentation {
   title: string;
@@ -177,9 +182,8 @@ const Chat: React.FC = () => {
         </div>
       ) : (
         <div className="w-full h-flex bg-[#F6F2ED] pt-[35px] pb-[35px] rounded-[20px] outline outline-3 outline-solid outline-[#86AD95] min-h-[50vh]">
-          feedback 1111
 
-          <div className="p-6 bg-[#F7F4ED] min-h-screen">
+          <div className="p-6 bg-[#F7F4ED] min-h-screen w-[1100px]">
   {/* Header */}
   <h1 className="text-[#5A6E58] text-[24px] font-bold mb-6">
     Tail-wagging feedback, just for you!
@@ -314,19 +318,20 @@ const Chat: React.FC = () => {
     <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
       <div className="flex items-center gap-3">
         <img
-          src="/path/to/filler.png"
+          src={Filler}
           alt="Filler Words icon"
           className="w-[36px] h-[36px] object-contain"
         />
         <p className="text-black text-[16px] font-medium">Filler Words</p>
       </div>
       <div className="text-black text-[16px] font-medium">12</div>
+      
     </div>
 
     <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
       <div className="flex items-center gap-3">
         <img
-          src="/path/to/emotions-icon.png"
+          src={Emotion}
           alt="Emotions icon"
           className="w-[36px] h-[36px] object-contain"
         />
@@ -338,7 +343,7 @@ const Chat: React.FC = () => {
     <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
       <div className="flex items-center gap-3">
         <img
-          src="/path/to/pacing-icon.png"
+          src={Pacing}
           alt="Pacing icon"
           className="w-[36px] h-[36px] object-contain"
         />
@@ -350,7 +355,7 @@ const Chat: React.FC = () => {
     <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
       <div className="flex items-center gap-3">
         <img
-          src="/path/to/volume-icon.png"
+          src={Volume}
           alt="Inconsistent Volume icon"
           className="w-[36px] h-[36px] object-contain"
         />
