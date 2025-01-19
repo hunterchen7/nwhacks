@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from "react";
 import DogHome from "/dog_home.gif";
 import ArrowIcon from "/arrow-icon.png";
-import Filler from "/filler.png";
-import Emotion from "/emotion.png";
-import Pacing from "/pace.png";
-import Volume from "/volume.png";
 import { LoadingModal } from "./loadingModal";
 import { Feedback } from "./feedback";
+import Review from "./review";
 
 export interface Presentation {
   file_name: string;
@@ -210,7 +207,7 @@ const Chat: React.FC = () => {
                     (total, presentation) =>
                       total + parseInt(presentation.duration),
                     0
-                  ) || "-"}
+                  ) / 60 || "-"}
                 </p>
               </div>
             </div>
@@ -303,65 +300,7 @@ const Chat: React.FC = () => {
         </div>
       ) : (
         <div className="absolute right-0 top-0 h-full w-[378px] bg-[#558066] flex flex-col items-center justify-start pt-8 pr-3 rounded-tl-[30px] rounded-bl-[30px]">
-          <div className="flex flex-col items-center justify-start p-6 gap-4">
-            {/* Header */}
-            <h1 className="text-white text-[24px] font-medium mb-4">
-              Review Suggestions
-            </h1>
-
-            {/* Suggestion Items */}
-            <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
-              <div className="flex items-center gap-3">
-                <img
-                  src={Filler}
-                  alt="Filler Words icon"
-                  className="w-[36px] h-[36px] object-contain"
-                />
-                <p className="text-black text-[16px] font-medium">
-                  Filler Words
-                </p>
-              </div>
-              <div className="text-black text-[16px] font-medium">12</div>
-            </div>
-
-            <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
-              <div className="flex items-center gap-3">
-                <img
-                  src={Emotion}
-                  alt="Emotions icon"
-                  className="w-[36px] h-[36px] object-contain"
-                />
-                <p className="text-black text-[16px] font-medium">Emotions</p>
-              </div>
-              <div className="text-black text-[16px] font-medium">12</div>
-            </div>
-
-            <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
-              <div className="flex items-center gap-3">
-                <img
-                  src={Pacing}
-                  alt="Pacing icon"
-                  className="w-[36px] h-[36px] object-contain"
-                />
-                <p className="text-black text-[16px] font-medium">Pacing</p>
-              </div>
-              <div className="text-black text-[16px] font-medium">12</div>
-            </div>
-
-            <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
-              <div className="flex items-center gap-3">
-                <img
-                  src={Volume}
-                  alt="Inconsistent Volume icon"
-                  className="w-[36px] h-[36px] object-contain"
-                />
-                <p className="text-black text-[16px] font-medium">
-                  Inconsistent Volume
-                </p>
-              </div>
-              <div className="text-black text-[16px] font-medium">12</div>
-            </div>
-          </div>
+          <Review presentation={focusedPresentation} />
         </div>
       )}
 

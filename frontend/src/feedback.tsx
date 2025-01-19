@@ -45,8 +45,7 @@ export const Feedback = (props: { presentation: Presentation }) => {
     };
 
     fetchFeedback();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [presentation.task_id]);
 
   return (
     <div className="w-full fixed bottom-0 h-[62vh] bg-[#F6F2ED] pt-[35px] rounded-[20px] outline outline-3 outline-solid outline-[#86AD95]">
