@@ -28,8 +28,10 @@ def process_audio(file_path: str, task_id: str):
 
         # Save results to tasks
         with open(f"{output_dir}/analysis_results.json", "r", encoding="utf-8") as result_file:
+            result_data = json.load(result_file)
             tasks[task_id]["status"] = "completed"
-            tasks[task_id]["results"] = json.load(result_file)
+            tasks[task_id]["results"] = result_data
+            tasks[task_id]["duration"] = result_data.get("duration", "Unknown")
         print(f"Task {task_id} completed successfully")
 
     except Exception as e:
@@ -37,50 +39,44 @@ def process_audio(file_path: str, task_id: str):
         tasks[task_id]["status"] = "failed"
         tasks[task_id]["error"] = str(e)
 
-# Endpoint: Upload File
 @app.post("/upload")
 async def upload_audio(file: UploadFile = File(...)):
-    """Upload an audio file and start processing."""    
+    """Upload an audio file and start processing."""
     task_id = str(uuid4())
     tasks[task_id] = {
-        "status": "processing",
+        "task_id": task_id,
         "file_name": file.filename,
-        "results": None,
+        "status": "processing",
         "uploaded_at": datetime.now().isoformat(),
+        "duration": None,
+        "results": None
     }
     # Save the file to disk
     file_path = f"uploads/{task_id}_{file.filename}"
     print(f"Saving file to {file_path}")
-    file_content = file.file.read()
-    print(f'file content length: {len(file_content)}')
-    
+    os.makedirs("uploads", exist_ok=True)
     with open(file_path, "wb") as file_object:
-        file_object.write(file_content)
+        shutil.copyfileobj(file.file, file_object)
 
     # Offload processing to a thread
     Thread(target=process_audio, args=(file_path, task_id)).start()
 
     return {"task_id": task_id, "status": "processing"}
 
-# Endpoint: Fetch Analysis
-@app.get("/fetch-analysis/{task_id}")
-async def fetch_analysis(task_id: str):
-    """Fetch analysis results for a specific task."""
-    if task_id not in tasks:
-        raise HTTPException(status_code=404, detail="Task ID not found")
-    task = tasks[task_id]
-    if task["status"] == "completed":
-        return {"status": "completed", "results": task["results"]}
-    elif task["status"] == "failed":
-        return {"status": "failed", "error": task["error"]}
-    else:
-        return {"status": task["status"]}
-
-# Endpoint: List All Analyses
 @app.get("/all-analyses")
 async def all_analyses():
     """List all analysis tasks."""
-    return {"tasks": tasks}
+    file_list = [
+        {
+            "task_id": task_id,
+            "file_name": task["file_name"],
+            "duration": task.get("duration", "Unknown"),
+            "uploaded_at": task["uploaded_at"],
+            "status": task["status"]
+        }
+        for task_id, task in tasks.items()
+    ]
+    return {"tasks": file_list}
 
 # Endpoint: Delete File
 @app.delete("/delete-file/{task_id}")
@@ -103,6 +99,37 @@ async def delete_file(task_id: str):
         shutil.rmtree(output_dir)
 
     return {"status": "success", "message": f"Task {task_id} deleted successfully"}
+  
+@app.get("/fetch-analysis/{task_id}")
+async def fetch_analysis(task_id: str):
+    """Fetch analysis results for a specific task."""
+    if task_id not in tasks:
+        raise HTTPException(status_code=404, detail="Task ID not found")
+
+    task = tasks[task_id]
+
+    # Return the appropriate response based on the task status
+    if task["status"] == "completed":
+        return {
+            "status": "completed",
+            "file_name": task["file_name"],
+            "duration": task.get("duration", "Unknown"),
+            "uploaded_at": task["uploaded_at"],
+            "results": task["results"]
+        }
+    elif task["status"] == "failed":
+        return {
+            "status": "failed",
+            "file_name": task["file_name"],
+            "uploaded_at": task["uploaded_at"],
+            "error": task["error"]
+        }
+    else:  # Status is "processing"
+        return {
+            "status": "processing",
+            "file_name": task["file_name"],
+            "uploaded_at": task["uploaded_at"]
+        }
 
 # Start FastAPI Server with Uvicorn
 if __name__ == "__main__":

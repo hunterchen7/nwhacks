@@ -205,20 +205,13 @@ const Chat: React.FC = () => {
             className="mb-4"
           />
 
-          <a
-            className="bg-black rounded-lg m-6 px-8 py-3 text-white text-[18px] hover:bg-slate-700 transition-all"
-            href="/chat" /*need to make new page for the feedback one*/
-          >
-            Upload .mp3 or .wav file
-          </a>
-
           {/* Upload Button */}
           <button
             onClick={handleUpload}
             disabled={!file || isLoading}
-            className="mb-4 p-2 bg-blue-500 text-white rounded"
+            className="bg-black rounded-lg m-6 px-8 py-3 text-white text-[18px] hover:bg-slate-700 transition-all cursor-pointer"
           >
-            {isLoading ? "Uploading..." : "Upload"}
+            Upload .wav file
           </button>
 
           {/* Display Results */}
