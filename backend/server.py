@@ -3,13 +3,13 @@ from uuid import uuid4
 import os
 import json
 from datetime import datetime
-from threading import Thread
+from threading import Thread, Lock
 import shutil
-
 from fastapi.responses import FileResponse
 from ai_scripts import preprocess_audio_pipeline
-
 from fastapi.middleware.cors import CORSMiddleware
+import time
+import atexit
 
 # FastAPI app instance
 app = FastAPI()
@@ -23,8 +23,41 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
-# In-memory task storage
+
+# Persistent task storage file
+TASKS_FILE = "tasks.json"
 tasks = {}
+lock = Lock()  # Lock for thread-safe updates to tasks
+
+# Load tasks from the JSON file on startup
+def load_tasks():
+    print('loading tasks')
+    global tasks
+    if os.path.exists(TASKS_FILE):
+        with open(TASKS_FILE, "r", encoding="utf-8") as f:
+            tasks = json.load(f)
+    else:
+        tasks = {}
+
+# Save tasks to the JSON file
+def save_tasks():
+    if tasks is None:
+        return
+    with lock:  # Ensure thread-safe write
+        with open(TASKS_FILE, "w", encoding="utf-8") as f:
+            json.dump(tasks, f, ensure_ascii=False, indent=4)
+
+# Periodically save tasks to ensure persistence
+def periodic_save_tasks(interval=10):
+    while True:
+        time.sleep(interval)
+        save_tasks()
+
+# Start periodic save in a background thread
+Thread(target=periodic_save_tasks, daemon=True).start()
+
+# Ensure tasks are saved on shutdown
+atexit.register(save_tasks)
 
 # Utility function to process the audio in a thread
 def process_audio(file_path: str, task_id: str):
@@ -156,6 +189,8 @@ async def fetch_audio(task_id: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(file_path, media_type="audio/wav")
+
+load_tasks()
 
 # Start FastAPI Server with Uvicorn
 if __name__ == "__main__":
