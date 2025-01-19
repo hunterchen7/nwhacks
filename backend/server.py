@@ -5,6 +5,8 @@ import json
 from datetime import datetime
 from threading import Thread
 import shutil
+
+from fastapi.responses import FileResponse
 from ai_scripts import preprocess_audio_pipeline
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -141,6 +143,19 @@ async def fetch_analysis(task_id: str):
             "file_name": task["file_name"],
             "uploaded_at": task["uploaded_at"]
         }
+        
+@app.get("/fetch-audio/{task_id}")
+async def fetch_audio(task_id: str):
+    """Fetch the audio file for a specific task."""
+    if task_id not in tasks:
+        raise HTTPException(status_code=404, detail="Task ID not found")
+
+    task = tasks[task_id]
+    file_path = f"uploads/{task_id}_{task['file_name']}"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(file_path, media_type="audio/wav")
 
 # Start FastAPI Server with Uvicorn
 if __name__ == "__main__":

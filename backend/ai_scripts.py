@@ -215,6 +215,9 @@ def preprocess_audio_pipeline(input_file, base_output_dir, model_name="base", pr
     segment_files = segment_audio_by_timestamps(data, rate, transcription["segments"], output_dir)
     emotion_model, feature_extractor = load_emotion_model()
 
+    overall_pacing = []
+    overall_volume = []
+
     for segment_file, segment in zip(segment_files, transcription["segments"]):
         print(f"Analyzing Segment {segment['id']}...")
 
@@ -222,8 +225,24 @@ def preprocess_audio_pipeline(input_file, base_output_dir, model_name="base", pr
         segment["emotion_analysis"] = analyze_emotion_with_huggingface(segment_file, emotion_model, feature_extractor)
         segment["filler_analysis"] = analyze_filler_words(segment["text"])
 
+        # Pacing analysis
+        segment_duration = segment["end"] - segment["start"]
+        segment_pacing = calculate_pacing(segment["text"], segment_duration)
+        segment["pacing"] = segment_pacing
+        overall_pacing.append(segment_pacing)
+
+        # Volume analysis
+        rate, segment_data = wavfile.read(segment_file)
+        segment_volume = calculate_volume(segment_data)
+        segment["volume"] = segment_volume
+        overall_volume.append(segment_volume)
+
     # Aggregate feedback for metrics
     feedback_summary = aggregate_feedback(transcription)
+    
+    # Add overall metrics for pacing and volume
+    transcription["average_pacing"] = np.mean(overall_pacing) if overall_pacing else 0
+    transcription["average_volume"] = np.mean(overall_volume) if overall_volume else 0
 
     # Load the local LLM for full-text analysis
     print("\nLoading local instruction-tuned LLM...")
@@ -245,6 +264,23 @@ def preprocess_audio_pipeline(input_file, base_output_dir, model_name="base", pr
     print(f"Analysis results saved to {merged_results_file}")
 
     return output_dir
+
+import numpy as np
+
+def calculate_pacing(segment_text, segment_duration):
+    """Calculate pacing (words per second)."""
+    word_count = len(segment_text.split())
+    if segment_duration > 0:
+        pacing = word_count / segment_duration
+    else:
+        pacing = 0
+    return pacing
+
+def calculate_volume(segment_data):
+    """Calculate average volume (RMS) for a segment."""
+    rms = np.sqrt(np.mean(np.square(segment_data.astype(float))))
+    return rms
+
 
 # Run the pipeline
 if __name__ == "__main__":
