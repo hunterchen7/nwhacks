@@ -141,7 +141,7 @@ const Chat: React.FC = () => {
           {/* New div for File Input, Upload Button, Display Results with background */}
       <div className="absolute right-0 top-0 h-full w-[378px] bg-[#558066] flex flex-col items-center justify-start pt-8 pr-3 rounded-tl-[30px] rounded-bl-[30px]">
 
-        <div className="mb-[20px] w-[82%] h-[80%] bg-[#6E977D] outline outline-4 outline-dotted outline-white rounded-[10px] flex justify-center items-center">
+        <div className="mb-[20px] w-[82%] h-[80%] bg-[#6E977D] outline outline-4 outline-dotted outline-white rounded-[10px] flex flex-col justify-center items-center">
         <img
             src={ArrowIcon}
             className="Arrow icon"
@@ -149,11 +149,20 @@ const Chat: React.FC = () => {
             width={100}
             height={100}
           />
+          <h3 className="text-center pt-[20px] text-white text-[16px] mb-4 font-normal">Drag & drop <br></br> your pitch here</h3>
+          
         </div>
 
         {/* File Input */}
         <input type="file" accept=".wav" onChange={handleFileChange} className="mb-4" />
         
+        <a
+        className="bg-black rounded-lg m-6 px-8 py-3 text-white text-[18px] hover:bg-slate-700 transition-all"
+        href="/chat" /*need to make new page for the feedback one*/
+      >
+        Upload .mp3 or .wav file
+      </a>
+
         {/* Upload Button */}
         <button onClick={handleUpload} disabled={!file || isLoading} className="mb-4 p-2 bg-blue-500 text-white rounded">
           {isLoading ? "Uploading..." : "Upload"}
