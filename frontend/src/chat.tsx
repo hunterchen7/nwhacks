@@ -29,7 +29,7 @@ const computeDuration = (duration: number) => {
 };
 
 // this should be an env var but oh well
-const apiUrl = "http://127.0.0.1:8000";
+export const apiUrl = "http://127.0.0.1:8000";
 
 const Chat: React.FC = () => {
   const [file, setFile] = useState<File | null>(null); // State to store the uploaded file
@@ -303,7 +303,7 @@ const Chat: React.FC = () => {
         </div>
       ) : (
         <div className="absolute right-0 top-0 h-full w-[378px] bg-[#558066] flex flex-col items-center justify-start pt-8 pr-3 rounded-tl-[30px] rounded-bl-[30px]">
-          <div className="min-h-screen flex flex-col items-center justify-start p-6 gap-4">
+          <div className="flex flex-col items-center justify-start p-6 gap-4">
             {/* Header */}
             <h1 className="text-white text-[24px] font-medium mb-4">
               Review Suggestions
