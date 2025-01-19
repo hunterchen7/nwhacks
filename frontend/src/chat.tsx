@@ -6,6 +6,7 @@ import Emotion from "/emotion.png";
 import Pacing from "/pace.png";
 import Volume from "/volume.png";
 import AudioTrans from "/audiotrans.png";
+import { LoadingModal } from "./loadingModal";
 
 export interface Presentation {
   file_name: string;
@@ -27,6 +28,7 @@ const Chat: React.FC = () => {
   const [focusedPresentation, setFocusedPresentation] =
     useState<Presentation | null>(null);
   const [presentationList, setPresentationList] = useState<Presentation[]>([]);
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -34,9 +36,11 @@ const Chat: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    console.log("Presentation list changed:", presentationList);
-  }, [presentationList]);
+  const presentationContains = (presentation: Presentation) => {
+    return openPresentations.some(
+      (openPresentation) => openPresentation.task_id === presentation.task_id
+    );
+  };
 
   useEffect(() => {
     const fetchData = () => {
@@ -45,7 +49,7 @@ const Chat: React.FC = () => {
       })
         .then((response) => response.json())
         .then((data) => {
-          console.log("Fetched presentations:", data);
+          // console.log("Fetched presentations:", data);            
           setPresentationList(data.tasks);
         })
         .catch((error) => {
@@ -72,17 +76,19 @@ const Chat: React.FC = () => {
 
     try {
       setIsLoading(true); // Set loading to true
-      const response = await fetch(`${apiUrl}/upload`, {
+      fetch(`${apiUrl}/upload`, {
         method: "POST",
         body: formData,
+      }).then((response) => {
+        if (response.ok) {
+          response.json().then((data) => {
+            console.log("Uploaded file:", data);
+            setCurrentTaskId(data.task_id);
+          });
+        } else {
+          alert("Error uploading file.");
+        }
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to upload file.");
-      }
-
-      await response.json();
-      console.log(`Successfully uploaded file: ${response}`);
     } catch (error) {
       console.error("Error uploading file:", error);
     } finally {
@@ -120,7 +126,9 @@ const Chat: React.FC = () => {
         <div className="flex max-w-[60vw] overflow-x-auto">
           <h3
             className={`h-20 text-black text-[24px] font-semibold px-8 mx-3 pt-3 mt-3 ${
-              focusedPresentation != null ? "bg-[#558066] text-white" : "bg-[#F6F2ED]"
+              focusedPresentation != null
+                ? "bg-[#558066] text-white"
+                : "bg-[#F6F2ED]"
             } outline outline-3 outline-solid outline-[#86AD95] rounded-lg transition-all cursor-pointer`}
             onClick={() => setFocusedPresentation(null)}
           >
@@ -129,7 +137,7 @@ const Chat: React.FC = () => {
           {openPresentations.map((presentation) => (
             <h3
               className={`h-20 text-black text-[24px] pb-4 font-semibold px-6 mx-3 mt-3 py-3 ${
-                focusedPresentation != presentation
+                focusedPresentation?.task_id !== presentation.task_id
                   ? "bg-black text-white"
                   : "bg-[#F6F2ED]"
               } outline outline-3 outline-solid outline-[#86AD95] rounded-lg cursor-pointer transition-all hover:outline-slate-500`}
@@ -211,17 +219,22 @@ const Chat: React.FC = () => {
                 presentationList.map((presentation) => (
                   <div
                     className="grid grid-cols-[3fr_1fr_1fr_1fr] gap-4 py-4 border-b"
-                    onClick={() => {
-                      if (!openPresentations.includes(presentation)) {
-                        setOpenPresentations([
-                          presentation,
-                          ...openPresentations,
-                        ]);
-                      }
-                      setFocusedPresentation(presentation);
-                    }}
+                    key={presentation.task_id}
                   >
-                    <div>{presentation.file_name}</div>
+                    <div
+                      className="cursor-pointer hover:underline"
+                      onClick={() => {
+                        if (!presentationContains(presentation)) {
+                          setOpenPresentations([
+                            presentation,
+                            ...openPresentations,
+                          ]);
+                        }
+                        setFocusedPresentation(presentation);
+                      }}
+                    >
+                      {presentation.file_name}
+                    </div>
                     <div>
                       {new Date(presentation.uploaded_at).toLocaleDateString()}
                     </div>
@@ -419,42 +432,20 @@ const Chat: React.FC = () => {
           </div>
         </div>
       )}
+
+      {currentTaskId &&
+        // loading if the current task is status processing
+        presentationList.some(
+          (presentation) =>
+            presentation.task_id === currentTaskId &&
+            presentation.status === "processing"
+        ) && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden">
+            <LoadingModal />
+          </div>
+        )}
     </div>
   );
 };
 
 export default Chat;
-
-/*const examplePresentations = [
-  {
-    title: "NwHacks Presentation",
-    duration: "60.34",
-    date: "2025-01-19T03:39:26.931200",
-  },
-  {
-    title: "Introduction to Figma",
-    duration: "15.23",
-    date: "2024-11-17T03:39:26.931200",
-  },
-  {
-    title: "Van Gogh Lecture: Techniques",
-    duration: "60.00",
-    date: "2024-11-05T03:39:26.931200",
-  },
-  {
-    title: "Introduction to Creative Coding with Processing.js",
-    duration: "30.00",
-    date: "2024-10-29T03:39:26.931200",
-  },
-  {
-    title: "Introduction to Figma 2",
-    duration: "30.00",
-    date: "2024-08-18T03:39:26.931200",
-  },
-  {
-    title: "NwHacks Presentation 2",
-    duration: "60.34",
-    date: "2025-01-19T03:39:26.931200",
-  },
-];
-*/
