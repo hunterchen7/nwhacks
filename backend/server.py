@@ -6,6 +6,7 @@ from datetime import datetime
 from speechbrain.pretrained import EncoderClassifier
 import librosa
 import torch
+from transformers import Wav2Vec2ForSequenceClassification, Wav2Vec2FeatureExtractor
 
 # Audio Processing Functions
 def load_audio(file_path):
@@ -56,6 +57,45 @@ def preprocess_audio(file_path, target_sr=16000):
     y, sr = librosa.load(file_path, sr=target_sr, mono=True)
     return torch.tensor(y).unsqueeze(0)  # Add batch dimension
 
+# Load the model and processor
+def load_emotion_model():
+    """Load the Hugging Face Wav2Vec2 model for emotion recognition."""
+    model_name = "ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition"
+    model = Wav2Vec2ForSequenceClassification.from_pretrained(model_name)
+    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_name)
+    return model, feature_extractor
+
+def analyze_emotion_with_huggingface(file_path, model, feature_extractor):
+    """Analyze emotions using Hugging Face Wav2Vec2 model."""
+    # Load and preprocess audio
+    y, sr = librosa.load(file_path, sr=16000, mono=True)  # Resample to 16 kHz
+    inputs = feature_extractor(y, sampling_rate=16000, return_tensors="pt", padding=True)
+
+    # Perform inference
+    with torch.no_grad():
+        logits = model(**inputs).logits
+
+    # Get probabilities and predicted emotion
+    probabilities = torch.nn.functional.softmax(logits, dim=-1)[0]
+    predicted_label = torch.argmax(probabilities).item()
+
+    # Emotion labels (specific to this model)
+    emotions = ['angry', 'calm', 'disgust', 'fearful', 'happy', 'neutral', 'sad', 'surprised']
+    predicted_emotion = emotions[predicted_label]
+
+    # Convert probabilities to a list
+    confidence_scores = probabilities.tolist()
+    confidence_scores[3] *= 0.9  # Adjust fearful confidence to be lower
+
+    print(f"Predicted Emotion: {predicted_emotion}")
+    print(f"Confidence Scores: {confidence_scores}")
+
+    return {
+        "predicted_emotion": predicted_emotion,
+        "confidence_scores": confidence_scores
+    }
+
+
 def analyze_emotion_with_speechbrain(file_path, model):
     """Analyze emotion using SpeechBrain with raw waveform input."""
     # Preprocess the audio file
@@ -92,39 +132,30 @@ def preprocess_audio_pipeline(input_file, base_output_dir, model_name="base", pr
 
     # Transcribe the audio
     transcription = transcribe_audio(input_file, model_name=model_name, prompt=prompt)
-    transcription_json_path = os.path.join(output_dir, "transcription.json")
-    save_transcription_to_json(transcription, transcription_json_path)
 
     # Segment audio
-    segments = transcription["segments"]
-    segment_files = segment_audio_by_timestamps(data, rate, segments, output_dir)
+    segment_files = segment_audio_by_timestamps(data, rate, transcription["segments"], output_dir)
 
-    # Load SpeechBrain Emotion Recognition model
-    print("\nLoading SpeechBrain Emotion Recognition model...")
-    emotion_model = EncoderClassifier.from_hparams(
-        source="speechbrain/emotion-recognition-wav2vec2-IEMOCAP",
-        savedir="pretrained_models/speechbrain_emotion"
-    )
+    # Load Hugging Face emotion model
+    print("\nLoading Hugging Face Emotion Recognition model...")
+    emotion_model, feature_extractor = load_emotion_model()
 
-    # Analyze emotions for each segment
+    # Analyze emotions for each segment and update transcription segments
     print("\nAnalyzing emotions for each segment...")
-    emotion_results = []
-    for segment_file, segment in zip(segment_files, segments):
+    for segment_file, segment in zip(segment_files, transcription["segments"]):
         print(f"Analyzing Segment {segment['id']}...")
-        emotion_features = analyze_emotion_with_speechbrain(segment_file, emotion_model)
-        emotion_results.append({
-            "segment_id": segment["id"],
-            "text": segment["text"],
-            "emotion_analysis": emotion_features
-        })
+        emotion_features = analyze_emotion_with_huggingface(segment_file, emotion_model, feature_extractor)
+        # Add emotion analysis directly into the transcription segments
+        segment["emotion_analysis"] = emotion_features
 
-    # Save emotion analysis results
-    emotion_results_file = os.path.join(output_dir, "emotion_analysis.json")
-    with open(emotion_results_file, "w", encoding="utf-8") as f:
-        json.dump(emotion_results, f, ensure_ascii=False, indent=4)
-    print(f"Emotion analysis results saved to {emotion_results_file}")
+    # Save transcription with embedded emotion analysis
+    merged_results_file = os.path.join(output_dir, "analysis_results.json")
+    with open(merged_results_file, "w", encoding="utf-8") as f:
+        json.dump(transcription, f, ensure_ascii=False, indent=4)
+    print(f"Analysis results saved to {merged_results_file}")
 
     return output_dir, segment_files
+
 
 # Run the pipeline
 if __name__ == "__main__":
@@ -132,7 +163,7 @@ if __name__ == "__main__":
     os.makedirs(base_output_directory, exist_ok=True)
 
     # Example: Process a new file
-    input_audio = "sample_bad.wav"
+    input_audio = "sample_good.wav"
     # Custom prompts to filter influencies back in
     custom_prompt = "uh, um, ah, like, you know, well, hmm, uh-huh, okay..."
     output_dir, segments = preprocess_audio_pipeline(
