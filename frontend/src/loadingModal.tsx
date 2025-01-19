@@ -19,7 +19,7 @@ export const LoadingModal = () => {
         Sit tight, fetching your results
         {Array.from({ length: periods }).map(() => ".")}
       </div>
-      <div className="flex mx-auto justify-center gap-4">
+      <div className="flex mx-auto justify-center gap-4 pb-6">
         <Bone />
         <Paw />
         <Bone />
