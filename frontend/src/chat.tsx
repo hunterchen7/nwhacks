@@ -124,7 +124,7 @@ const Chat: React.FC = () => {
 
             {/* Column 1 */}
             <div className="flex-1 p-4 text-left whitespace-nowrap">
-              <h1 className="text-black text-[24px] mb-4 font-medium mt-[35px] ml-[160px]">
+              <h1 className="text-black text-[24px] mb-4 font-medium mt-[35px] ml-[200px]">
                 Let's practice a presentation today!
               </h1>
             </div>
@@ -315,6 +315,9 @@ const Chat: React.FC = () => {
             <LoadingModal />
           </div>
         )}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <LoadingModal />
+          </div>
     </div>
   );
 };
