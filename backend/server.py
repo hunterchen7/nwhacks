@@ -13,26 +13,10 @@ app = FastAPI()
 # In-memory task storage
 tasks = {}
 
-# Utility function to save and process files
-def save_and_process_audio(uploadedFile: UploadFile, task_id: str):
-    """Save uploaded file and start processing."""
-    print(f"Saving and processing audio for task {task_id} with file {uploadedFile.filename}")
+# Utility function to process the audio in a thread
+def process_audio(file_path: str, task_id: str):
+    """Process the audio file in a background thread."""
     try:
-        # Save the file
-        file_path = f"uploads/{task_id}_{uploadedFile.filename}"
-        os.makedirs("uploads", exist_ok=True)
-        print("creating file on disk")
-        
-        # Write file content to disk directly from UploadFile
-        with open(file_path, "wb") as f:
-            print("Writing file to disk...")
-            shutil.copyfileobj(uploadedFile.file, f)
-        print(f"File saved successfully: {file_path}")
-
-        # Reset file pointer after reading (important if you need to read again later)
-        uploadedFile.file.seek(0)
-
-        # Start the processing pipeline
         print(f"Starting preprocess_audio_pipeline for task {task_id}")
         output_dir = preprocess_audio_pipeline(
             input_file=file_path,
@@ -53,10 +37,6 @@ def save_and_process_audio(uploadedFile: UploadFile, task_id: str):
         tasks[task_id]["status"] = "failed"
         tasks[task_id]["error"] = str(e)
 
-    finally:
-        # Explicitly close the UploadFile object
-        uploadedFile.file.close()
-
 # Endpoint: Upload File
 @app.post("/upload")
 async def upload_audio(file: UploadFile = File(...)):
@@ -68,9 +48,17 @@ async def upload_audio(file: UploadFile = File(...)):
         "results": None,
         "uploaded_at": datetime.now().isoformat(),
     }
+    # Save the file to disk
+    file_path = f"uploads/{task_id}_{file.filename}"
+    print(f"Saving file to {file_path}")
+    file_content = file.file.read()
+    print(f'file content length: {len(file_content)}')
+    
+    with open(file_path, "wb") as file_object:
+        file_object.write(file_content)
 
     # Offload processing to a thread
-    Thread(target=save_and_process_audio, args=(file, task_id)).start()
+    Thread(target=process_audio, args=(file_path, task_id)).start()
 
     return {"task_id": task_id, "status": "processing"}
 
