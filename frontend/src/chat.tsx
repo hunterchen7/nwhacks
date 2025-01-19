@@ -177,7 +177,7 @@ const Chat: React.FC = () => {
         </div>
       ) : (
         <div className="w-full h-flex bg-[#F6F2ED] pt-[35px] pb-[35px] rounded-[20px] outline outline-3 outline-solid outline-[#86AD95] min-h-[50vh]">
-          feedback
+          feedback 1111
         </div>
       )}
 
@@ -231,7 +231,66 @@ const Chat: React.FC = () => {
         </div>
       ) : (
         <div className="absolute right-0 top-0 h-full w-[378px] bg-[#558066] flex flex-col items-center justify-start pt-8 pr-3 rounded-tl-[30px] rounded-bl-[30px]">
-          feedback
+
+          
+          <div className="min-h-screen flex flex-col items-center justify-start p-6 gap-4">
+    {/* Header */}
+    <h1 className="text-white text-[24px] font-medium mb-4">Review Suggestions</h1>
+
+    {/* Suggestion Items */}
+    <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
+      <div className="flex items-center gap-3">
+        <img
+          src="/path/to/filler.png"
+          alt="Filler Words icon"
+          className="w-[36px] h-[36px] object-contain"
+        />
+        <p className="text-black text-[16px] font-medium">Filler Words</p>
+      </div>
+      <div className="text-black text-[16px] font-medium">12</div>
+    </div>
+
+    <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
+      <div className="flex items-center gap-3">
+        <img
+          src="/path/to/emotions-icon.png"
+          alt="Emotions icon"
+          className="w-[36px] h-[36px] object-contain"
+        />
+        <p className="text-black text-[16px] font-medium">Emotions</p>
+      </div>
+      <div className="text-black text-[16px] font-medium">12</div>
+    </div>
+
+    <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
+      <div className="flex items-center gap-3">
+        <img
+          src="/path/to/pacing-icon.png"
+          alt="Pacing icon"
+          className="w-[36px] h-[36px] object-contain"
+        />
+        <p className="text-black text-[16px] font-medium">Pacing</p>
+      </div>
+      <div className="text-black text-[16px] font-medium">12</div>
+    </div>
+
+    <div className="flex items-center justify-between bg-white w-[90%] rounded-[20px] px-4 py-3 shadow-md">
+      <div className="flex items-center gap-3">
+        <img
+          src="/path/to/volume-icon.png"
+          alt="Inconsistent Volume icon"
+          className="w-[36px] h-[36px] object-contain"
+        />
+        <p className="text-black text-[16px] font-medium">Inconsistent Volume</p>
+      </div>
+      <div className="text-black text-[16px] font-medium">12</div>
+    </div>
+  </div>
+
+
+
+
+
         </div>
       )}
     </div>
