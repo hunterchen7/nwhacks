@@ -6,7 +6,7 @@ from datetime import datetime
 from speechbrain.pretrained import EncoderClassifier
 import librosa
 import torch
-from transformers import Wav2Vec2ForSequenceClassification, Wav2Vec2FeatureExtractor
+from transformers import Wav2Vec2ForSequenceClassification, Wav2Vec2FeatureExtractor, AutoModelForCausalLM, AutoTokenizer
 
 # Audio Processing Functions
 def load_audio(file_path):
@@ -78,16 +78,6 @@ def analyze_emotion_with_huggingface(file_path, model, feature_extractor):
     # Get probabilities and predicted emotion
     probabilities = torch.nn.functional.softmax(logits, dim=-1)[0]
     
-    # adjust probabilities to our liking
-    probabilities[0] *= 0.99
-    probabilities[1] *= 1.03
-    probabilities[2] *= 1
-    probabilities[3] *= 1
-    probabilities[4] *= 1.016
-    probabilities[5] *= 1.03
-    probabilities[6] *= 1
-    probabilities[7] *= 1
-    
     predicted_label = torch.argmax(probabilities).item()
 
     # Emotion labels (specific to this model)
@@ -105,37 +95,106 @@ def analyze_emotion_with_huggingface(file_path, model, feature_extractor):
         "predicted_emotion": predicted_emotion,
         "confidence_scores": confidence_scores
     }
-
-
-def analyze_emotion_with_speechbrain(file_path, model):
-    """Analyze emotion using SpeechBrain with raw waveform input."""
-    # Preprocess the audio file
-    waveform = preprocess_audio(file_path)
-
-    # Pass waveform through the model
-    embeddings = model.mods.wav2vec2(waveform)  # Extract features with wav2vec2
-    pooled_embeddings = model.mods.avg_pool(embeddings)  # Pool features
-    logits = model.mods.output_mlp(pooled_embeddings)  # Map to emotion logits
-    probabilities = torch.nn.functional.softmax(logits, dim=-1)  # Convert to probabilities
-
-    # Get the predicted emotion
-    predicted_label = torch.argmax(probabilities, dim=-1).item()
-    confidence_scores = probabilities.squeeze().tolist()
-
-    # Map predicted label to emotion
-    emotions = ["neutral", "happy", "angry", "sad"]  # Adjust based on your model's output order
-    predicted_emotion = emotions[predicted_label]
-
-    print(f"Predicted Emotion: {predicted_emotion}")
-    print(f"Confidence Scores: {confidence_scores}")
-
-    return {
-        "predicted_emotion": predicted_emotion,
-        "confidence_scores": confidence_scores
+    
+def aggregate_feedback(transcription):
+    """Aggregate feedback from all segments into a structured format."""
+    feedback_summary = {
+        "overall_emotions": [],
+        "overall_fillers": 0,
+        "segment_feedback": []
     }
 
+    for segment in transcription["segments"]:
+        feedback_summary["overall_emotions"].append(segment["emotion_analysis"]["predicted_emotion"])
+        feedback_summary["overall_fillers"] += segment["filler_analysis"]["total_fillers"]
+        feedback_summary["segment_feedback"].append({
+            "segment_id": segment["id"],
+            "text": segment["text"],
+            "emotion": segment["emotion_analysis"]["predicted_emotion"],
+            "fillers": segment["filler_analysis"]["total_fillers"],
+            "filler_percentage": segment["filler_analysis"]["filler_percentage"]
+        })
 
-# Main Processing Pipeline
+    # Summarize overall emotions
+    emotion_counts = {emotion: feedback_summary["overall_emotions"].count(emotion) for emotion in set(feedback_summary["overall_emotions"])}
+    feedback_summary["overall_emotions_summary"] = emotion_counts
+
+    return feedback_summary
+
+    
+def load_local_model(model_name="Qwen/Qwen2.5-0.5B-Instruct"):
+    """Load a local instruction-tuned model."""
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")  # Leverage GPU if available
+    return model, tokenizer
+
+def generate_summary_with_local_model(feedback_summary, model, tokenizer):
+    """Generate a summarized feedback report using a local LLM."""
+    # Refine the prompt to remove verbosity
+    prompt = f"""
+    Summarize the following feedback for an audio transcript analysis:
+    
+    Total Fillers: {feedback_summary['overall_fillers']}
+    Emotion Summary: {feedback_summary['overall_emotions_summary']}
+    Segment Highlights: {[
+        {
+            "segment_id": segment["segment_id"],
+            "emotion": segment["emotion"],
+            "fillers": segment["fillers"]
+        }
+        for segment in feedback_summary["segment_feedback"]
+    ]}
+
+    Provide actionable suggestions to reduce fillers, improve emotional engagement, and enhance clarity.
+    
+    The summary must be under 100 words, and should not contain any part of the original prompt.
+    """
+
+    # Tokenize input with truncation
+    inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to("cuda")
+
+    # Generate output with increased max_length
+    outputs = model.generate(
+        inputs["input_ids"],
+        max_length=1024,  # Increase maximum token length
+        temperature=0.7,  # Adjust temperature for better creativity
+        no_repeat_ngram_size=3  # Prevent repetitive outputs
+    )
+    summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return summary
+
+
+import re
+def analyze_filler_words(transcript, filler_words=None):
+    """
+    Analyze the transcript to detect and count filler words.
+    Args:
+        transcript (str): The transcribed text from the audio segment.
+        filler_words (list): List of filler words to detect.
+    Returns:
+        dict: A dictionary with filler word counts and their percentage.
+    """
+    if filler_words is None:
+        filler_words = ["uh", "um", "ah", "like", "you know", "well", "hmm"]
+
+    # Normalize text
+    transcript = transcript.lower()
+    words = re.findall(r'\b\w+\b', transcript)  # Tokenize words
+    total_words = len(words)
+
+    # Count filler words
+    filler_counts = {word: transcript.count(word) for word in filler_words}
+    total_fillers = sum(filler_counts.values())
+
+    # Calculate percentage
+    filler_percentage = (total_fillers / total_words) * 100 if total_words > 0 else 0
+
+    return {
+        "filler_counts": filler_counts,
+        "total_fillers": total_fillers,
+        "filler_percentage": filler_percentage,
+    }
+    
 def preprocess_audio_pipeline(input_file, base_output_dir, model_name="base", prompt=None):
     """Complete transcription and emotion analysis pipeline."""
     output_dir = generate_unique_output_dir(base_output_dir, input_file)
@@ -151,15 +210,30 @@ def preprocess_audio_pipeline(input_file, base_output_dir, model_name="base", pr
     print("\nLoading Hugging Face Emotion Recognition model...")
     emotion_model, feature_extractor = load_emotion_model()
 
-    # Analyze emotions for each segment and update transcription segments
-    print("\nAnalyzing emotions for each segment...")
+    # Analyze emotions and fillers for each segment
+    print("\nAnalyzing emotions and filler words for each segment...")
     for segment_file, segment in zip(segment_files, transcription["segments"]):
         print(f"Analyzing Segment {segment['id']}...")
+
+        # Emotion analysis
         emotion_features = analyze_emotion_with_huggingface(segment_file, emotion_model, feature_extractor)
-        # Add emotion analysis directly into the transcription segments
         segment["emotion_analysis"] = emotion_features
 
-    # Save transcription with embedded emotion analysis
+        # Filler analysis
+        filler_analysis = analyze_filler_words(segment["text"])
+        segment["filler_analysis"] = filler_analysis
+
+    # Aggregate feedback
+    feedback_summary = aggregate_feedback(transcription)
+
+    # Generate summarized feedback using local LLM
+    print("\nLoading local instruction-tuned LLM...")
+    local_model, local_tokenizer = load_local_model()
+    print("\nGenerating summarized feedback for the entire audio...")
+    summarized_feedback = generate_summary_with_local_model(feedback_summary, local_model, local_tokenizer)
+    transcription["summarized_feedback"] = summarized_feedback
+
+    # Save the updated transcription
     merged_results_file = os.path.join(output_dir, "analysis_results.json")
     with open(merged_results_file, "w", encoding="utf-8") as f:
         json.dump(transcription, f, ensure_ascii=False, indent=4)
@@ -174,7 +248,7 @@ if __name__ == "__main__":
     os.makedirs(base_output_directory, exist_ok=True)
 
     # Example: Process a new file
-    input_audio = "sample_good.wav"
+    input_audio = "bernie.wav"
     # Custom prompts to filter influencies back in
     custom_prompt = "uh, um, ah, like, you know, well, hmm, uh-huh, okay..."
     output_dir, segments = preprocess_audio_pipeline(
