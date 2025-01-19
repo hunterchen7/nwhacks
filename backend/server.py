@@ -7,8 +7,19 @@ from threading import Thread
 import shutil
 from ai_scripts import preprocess_audio_pipeline
 
+from fastapi.middleware.cors import CORSMiddleware
+
 # FastAPI app instance
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 # In-memory task storage
 tasks = {}

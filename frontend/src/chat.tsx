@@ -1,28 +1,60 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import DogHome from "/dog_home.gif";
 import ArrowIcon from "/arrow-icon.png";
 
 interface Presentation {
-  title: string;
+  file_name: string;
+  status: string;
+  task_id: string;
   duration: string;
-  date: string;
+  uploaded_at: string;
 }
+
+// this should be an env var but oh well
+const apiUrl = "http://127.0.0.1:8000";
 
 const Chat: React.FC = () => {
   const [file, setFile] = useState<File | null>(null); // State to store the uploaded file
-  const [result, setResult] = useState<string | null>(null); // State to store the server response
   const [isLoading, setIsLoading] = useState<boolean>(false); // State to manage loading status
   const [openPresentations, setOpenPresentations] = useState<Presentation[]>(
     []
   );
   const [focusedPresentation, setFocusedPresentation] =
     useState<Presentation | null>(null);
+  const [presentationList, setPresentationList] = useState<Presentation[]>([]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
       setFile(event.target.files[0]);
     }
   };
+
+  useEffect(() => {
+    console.log("Presentation list changed:", presentationList);
+  }, [presentationList]);
+
+  useEffect(() => {
+    const fetchData = () => {
+      fetch(`${apiUrl}/all-analyses`, {
+        method: "GET",
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          console.log("Fetched presentations:", data);
+          setPresentationList(data.tasks);
+        })
+        .catch((error) => {
+          console.error("Error fetching presentations:", error);
+        });
+    };
+
+    // Call fetchData initially and set up an interval to refetch every second
+    fetchData();
+    const intervalId = setInterval(fetchData, 3000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
+  }, []);
 
   const handleUpload = async () => {
     if (!file) {
@@ -35,7 +67,7 @@ const Chat: React.FC = () => {
 
     try {
       setIsLoading(true); // Set loading to true
-      const response = await fetch("http://127.0.0.1:8000/upload", {
+      const response = await fetch(`${apiUrl}/upload`, {
         method: "POST",
         body: formData,
       });
@@ -44,11 +76,10 @@ const Chat: React.FC = () => {
         throw new Error("Failed to upload file.");
       }
 
-      const data = await response.json();
-      setResult(JSON.stringify(data, null, 2)); // Store the server response as JSON
+      await response.json();
+      console.log(`Successfully uploaded file: ${response}`);
     } catch (error) {
       console.error("Error uploading file:", error);
-      setResult("Error uploading file. Please try again.");
     } finally {
       setIsLoading(false); // Set loading to false
     }
@@ -99,7 +130,7 @@ const Chat: React.FC = () => {
               } outline outline-3 outline-solid outline-[#86AD95] rounded-lg`}
               onClick={() => setFocusedPresentation(presentation)}
             >
-              {presentation.title}
+              {presentation.file_name}
             </h3>
           ))}
         </div>
@@ -147,31 +178,36 @@ const Chat: React.FC = () => {
           </h1>
 
           <div className="w-full max-w-5xl p-4 border rounded-lg bg-white ml-[58px]">
-            <div className="grid grid-cols-[3fr_1fr_1fr] gap-4 border-b py-4 font-semibold text-black">
+            <div className="grid grid-cols-[3fr_1fr_1fr_1fr] gap-4 border-b py-4 font-semibold text-black">
               <div>Title</div>
               <div>Date</div>
               <div>Duration</div>
+              <div>Status</div>
             </div>
 
             <div className="max-h-[30vh] overflow-y-auto">
-              {examplePresentations.map((presentation) => (
-                <div
-                  className="grid grid-cols-[3fr_1fr_1fr] gap-4 py-4 border-b"
-                  onClick={() => {
-                    if (!openPresentations.includes(presentation)) {
-                      setOpenPresentations([
-                        presentation,
-                        ...openPresentations,
-                      ]);
-                    }
-                    setFocusedPresentation(presentation);
-                  }}
-                >
-                  <div>{presentation.title}</div>
-                  <div>{new Date(presentation.date).toLocaleDateString()}</div>
-                  <div>{presentation.duration} minutes</div>
-                </div>
-              ))}
+              {presentationList &&
+                presentationList.map((presentation) => (
+                  <div
+                    className="grid grid-cols-[3fr_1fr_1fr_1fr] gap-4 py-4 border-b"
+                    onClick={() => {
+                      if (!openPresentations.includes(presentation)) {
+                        setOpenPresentations([
+                          presentation,
+                          ...openPresentations,
+                        ]);
+                      }
+                      setFocusedPresentation(presentation);
+                    }}
+                  >
+                    <div>{presentation.file_name}</div>
+                    <div>
+                      {new Date(presentation.uploaded_at).toLocaleDateString()}
+                    </div>
+                    <div>{presentation.duration} </div>
+                    <div>{presentation.status}</div>
+                  </div>
+                ))}
             </div>
           </div>
         </div>
@@ -213,14 +249,6 @@ const Chat: React.FC = () => {
           >
             Upload .wav file
           </button>
-
-          {/* Display Results */}
-          {result && (
-            <div className="text-left">
-              <h2 className="font-medium">Results:</h2>
-              <pre>{result}</pre>
-            </div>
-          )}
         </div>
       ) : (
         <div className="absolute right-0 top-0 h-full w-[378px] bg-[#558066] flex flex-col items-center justify-start pt-8 pr-3 rounded-tl-[30px] rounded-bl-[30px]">
@@ -233,7 +261,7 @@ const Chat: React.FC = () => {
 
 export default Chat;
 
-const examplePresentations = [
+/*const examplePresentations = [
   {
     title: "NwHacks Presentation",
     duration: "60.34",
@@ -265,3 +293,4 @@ const examplePresentations = [
     date: "2025-01-19T03:39:26.931200",
   },
 ];
+*/
