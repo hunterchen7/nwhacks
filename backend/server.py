@@ -77,15 +77,26 @@ def analyze_emotion_with_huggingface(file_path, model, feature_extractor):
 
     # Get probabilities and predicted emotion
     probabilities = torch.nn.functional.softmax(logits, dim=-1)[0]
+    
+    # adjust probabilities to our liking
+    probabilities[0] *= 0.99
+    probabilities[1] *= 1.03
+    probabilities[2] *= 1
+    probabilities[3] *= 1
+    probabilities[4] *= 1.016
+    probabilities[5] *= 1.03
+    probabilities[6] *= 1
+    probabilities[7] *= 1
+    
     predicted_label = torch.argmax(probabilities).item()
 
     # Emotion labels (specific to this model)
     emotions = ['angry', 'calm', 'disgust', 'fearful', 'happy', 'neutral', 'sad', 'surprised']
+    # Convert probabilities to a list
+    confidence_scores = probabilities.tolist()    
+    
     predicted_emotion = emotions[predicted_label]
 
-    # Convert probabilities to a list
-    confidence_scores = probabilities.tolist()
-    confidence_scores[3] *= 0.9  # Adjust fearful confidence to be lower
 
     print(f"Predicted Emotion: {predicted_emotion}")
     print(f"Confidence Scores: {confidence_scores}")
