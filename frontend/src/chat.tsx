@@ -73,6 +73,11 @@ const Chat: React.FC = () => {
       </div>
     </div>
 
+    {/*placeholder for tab texts styling*/}
+    <h3 className="text-black text-[24px] mb-4 font-semibold">Home</h3>
+    <h3 className="text-black text-[24px] mb-4 font-semibold">Feedback</h3>
+
+
     <div className="w-full h-flex bg-[#F6F2ED] pt-[35px] pb-[35px] rounded-[20px] outline outline-3 outline-solid outline-[#86AD95]">
 
       {/* Dashboard Analytics */}
