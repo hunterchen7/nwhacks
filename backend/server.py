@@ -3,7 +3,6 @@ import os
 import json
 from scipy.io import wavfile
 from datetime import datetime
-from speechbrain.pretrained import EncoderClassifier
 import librosa
 import torch
 from transformers import Wav2Vec2ForSequenceClassification, Wav2Vec2FeatureExtractor, AutoModelForCausalLM, AutoTokenizer
@@ -12,8 +11,9 @@ from transformers import Wav2Vec2ForSequenceClassification, Wav2Vec2FeatureExtra
 def load_audio(file_path):
     """Load the WAV file."""
     rate, data = wavfile.read(file_path)
+    duration = len(data) / rate
     print(f"Audio loaded: {file_path} | Sample Rate: {rate} | Duration: {len(data)/rate:.2f} sec")
-    return rate, data
+    return rate, data, duration
 
 def transcribe_audio(file_path, model_name="base", prompt=None):
     """Transcribe audio using Whisper with optional custom prompts."""
@@ -152,7 +152,6 @@ def generate_summary_with_local_model(transcription_text, feedback_summary, mode
     inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to("cuda")
     outputs = model.generate(
         inputs["input_ids"],
-        temperature=0.7,
         no_repeat_ngram_size=3,
         max_length=1024,
         num_beams=3,
@@ -160,10 +159,14 @@ def generate_summary_with_local_model(transcription_text, feedback_summary, mode
 
     # Decode and clean the output
     summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    print('pre-cutoff summary: ', summary)
 
     # Remove any prompt-like content from the output
     if "### Analysis:" in summary:
         summary = summary.split("### Analysis:")[-1].strip()
+        
+    summary = summary.split("\n\n")[0].strip()  # Only keep the first paragraph
 
     return summary
 
@@ -202,7 +205,8 @@ def analyze_filler_words(transcript, filler_words=None):
 def preprocess_audio_pipeline(input_file, base_output_dir, model_name="base", prompt=None):
     """Complete transcription and text analysis pipeline."""
     output_dir = generate_unique_output_dir(base_output_dir, input_file)
-    rate, data = load_audio(input_file)
+    rate, data, duration = load_audio(input_file)
+    upload_time = datetime.now().isoformat()
 
     # Transcribe the audio
     transcription = transcribe_audio(input_file, model_name=model_name, prompt=prompt)
@@ -230,6 +234,9 @@ def preprocess_audio_pipeline(input_file, base_output_dir, model_name="base", pr
     summarized_feedback = generate_summary_with_local_model(transcription["text"], feedback_summary, local_model, local_tokenizer)
     print("\nSummarized Feedback:", summarized_feedback)
     transcription["summarized_feedback"] = summarized_feedback
+    
+    transcription["duration"] = duration
+    transcription["uploaded_at"] = upload_time
 
     # Save the updated transcription with all metadata
     merged_results_file = os.path.join(output_dir, "analysis_results.json")
@@ -246,7 +253,7 @@ if __name__ == "__main__":
     os.makedirs(base_output_directory, exist_ok=True)
 
     # Example: Process a new file
-    input_audio = "kimmi3.wav"
+    input_audio = "bernie.wav"
     # Custom prompts to filter influencies back in
     custom_prompt = "uh, um, ah, like, you know, well, hmm, uh-huh, okay..."
     output_dir = preprocess_audio_pipeline(
