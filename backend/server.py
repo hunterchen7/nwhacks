@@ -128,30 +128,28 @@ def load_local_model(model_name="Qwen/Qwen2.5-0.5B-Instruct"):
     model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")  # Leverage GPU if available
     return model, tokenizer
 
-def generate_summary_with_local_model(transcription_text, model, tokenizer):
+def generate_summary_with_local_model(transcription_text, feedback_summary, model, tokenizer):
     """
-    Generate a concise summary of the transcription text using a local LLM.
+    Generate a concise summary of the transcription text using a local LLM,
+    incorporating filler and emotion analysis.
     """
     prompt = f"""
-  You are an expert speech coach. Provide feedback on the following presentation transcript. Focus on:
+    You are a extremely concise expert speech coach. Provide feedback on the following presentation transcript directly to me. Focus on:
 
-    - Filler words usage and suggestions for improvement.
-    - Emotional tone and engagement throughout the presentation.
-    - Overall clarity, coherence, and delivery.
+    - Filler word usage and improvement.
+    - Emotional tone and audience engagement.
+    - Clarity, coherence, and delivery.
 
     Transcript:
     {transcription_text}
 
-    Your response should be concise (3–4 sentences) and provide actionable feedback to help the speaker improve their delivery and audience engagement.
-
+    Your response must be as concise as possible and under 3 sentences and provide actionable feedback to help me improve delivery. 
 
     ### Analysis:
     """
 
-    # Tokenize the input
+    # Tokenize and generate output
     inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to("cuda")
-
-    # Generate the output
     outputs = model.generate(
         inputs["input_ids"],
         temperature=0.7,
@@ -209,27 +207,27 @@ def preprocess_audio_pipeline(input_file, base_output_dir, model_name="base", pr
     # Transcribe the audio
     transcription = transcribe_audio(input_file, model_name=model_name, prompt=prompt)
 
-    # Segment audio and analyze emotions/fillers (kept for metadata purposes)
+    # Segment audio and analyze emotions/fillers
     segment_files = segment_audio_by_timestamps(data, rate, transcription["segments"], output_dir)
     emotion_model, feature_extractor = load_emotion_model()
 
     for segment_file, segment in zip(segment_files, transcription["segments"]):
         print(f"Analyzing Segment {segment['id']}...")
 
-        # Keep emotion and filler analysis for other use cases
+        # Emotion and filler analysis
         segment["emotion_analysis"] = analyze_emotion_with_huggingface(segment_file, emotion_model, feature_extractor)
         segment["filler_analysis"] = analyze_filler_words(segment["text"])
+
+    # Aggregate feedback for metrics
+    feedback_summary = aggregate_feedback(transcription)
 
     # Load the local LLM for full-text analysis
     print("\nLoading local instruction-tuned LLM...")
     local_model, local_tokenizer = load_local_model(model_name="HuggingFaceTB/SmolLM2-360M-Instruct")
 
-    # transcript to test LLM so i dont have to rerun every time
-    # transcription = bernie
-
-    # Analyze the transcription text with the LLM
-    print("\nAnalyzing transcription text content...")
-    summarized_feedback = generate_summary_with_local_model(transcription["text"], local_model, local_tokenizer)
+    # Generate summary using aggregated feedback and transcription text
+    print("\nGenerating summarized presentation feedback...")
+    summarized_feedback = generate_summary_with_local_model(transcription["text"], feedback_summary, local_model, local_tokenizer)
     print("\nSummarized Feedback:", summarized_feedback)
     transcription["summarized_feedback"] = summarized_feedback
 
@@ -240,6 +238,7 @@ def preprocess_audio_pipeline(input_file, base_output_dir, model_name="base", pr
     print(f"Analysis results saved to {merged_results_file}")
 
     return output_dir
+
 
 # Run the pipeline
 if __name__ == "__main__":
