@@ -36,23 +36,25 @@ const Review = (props: { presentation: Presentation }) => {
     fetchFeedback();
   }, [presentation.task_id]);
 
-  if (!analysis) {
+  if (!analysis || !analysis.results) {
     return <div>Loading...</div>;
   }
 
-  const segments = analysis?.results.segments;
-  // count volume 10% above average and 10% below average
+  const segments = analysis?.results?.segments ?? [];
+  const averageVolume = analysis?.results?.average_volume ?? 0;
+  const averagePacing = analysis?.results?.average_pacing ?? 0;
+
+  // Initialize variables
   let volumenBelow = 0;
   let volumenAbove = 0;
   let paceBelow = 0;
   let paceAbove = 0;
   const emotionCounts: { [key: string]: number } = {};
-  if (segments) {
-    const averageVolume = analysis.results.average_volume;
-    const averagePacing = analysis.results.average_pacing;
+
+  if (segments.length > 0) {
     segments.forEach((segment: any) => {
-      const currEmotion = segment?.emotion_analysis?.predicted_emotion;
-      console.log("emotion: ", currEmotion);
+      const currEmotion =
+        segment?.emotion_analysis?.predicted_emotion ?? "Unknown";
       if (emotionCounts[currEmotion]) {
         emotionCounts[currEmotion]++;
       } else {
@@ -70,18 +72,21 @@ const Review = (props: { presentation: Presentation }) => {
       }
     });
   }
-  const mostFrequentEmotion = Object.keys(emotionCounts).reduce((a, b) =>
-    emotionCounts[a] > emotionCounts[b] ? a : b
+
+  const mostFrequentEmotion = Object.keys(emotionCounts).reduce(
+    (a, b) => (emotionCounts[a] > emotionCounts[b] ? a : b),
+    "Unknown"
   );
 
-  // Extract relevant data
-  const totalFillerWords = analysis.results.segments.reduce(
-    (sum: number, segment: any) => sum + segment.filler_analysis.total_fillers,
+  // Extract relevant data with default values
+  const totalFillerWords = segments.reduce(
+    (sum: number, segment: any) =>
+      sum + (segment?.filler_analysis?.total_fillers ?? 0),
     0
   );
-  const totalSegments = analysis.results.segments.length;
-  const averagePacing = analysis.results.average_pacing.toFixed(2);
-  const averageVolume = analysis.results.average_volume.toFixed(2);
+  const totalSegments = segments.length;
+  const formattedPacing = averagePacing.toFixed(2);
+  const formattedVolume = averageVolume.toFixed(2);
 
   return (
     <div className="flex flex-col items-center justify-start p-6 gap-4">
@@ -165,8 +170,8 @@ const Review = (props: { presentation: Presentation }) => {
           }`}
         >
           <p>
-            Your average pacing is {averagePacing} words per second. There were{" "}
-            {paceAbove} segments where you were too fast, and {paceBelow}{" "}
+            Your average pacing is {formattedPacing} words per second. There
+            were {paceAbove} segments where you were too fast, and {paceBelow}{" "}
             segments where you were too slow.
           </p>
         </div>
