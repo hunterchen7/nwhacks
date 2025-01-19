@@ -5,8 +5,8 @@ import Filler from "/filler.png";
 import Emotion from "/emotion.png";
 import Pacing from "/pace.png";
 import Volume from "/volume.png";
-import AudioTrans from "/audiotrans.png";
 import { LoadingModal } from "./loadingModal";
+import { Feedback } from "./feedback";
 
 export interface Presentation {
   file_name: string;
@@ -15,6 +15,18 @@ export interface Presentation {
   duration: string;
   uploaded_at: string;
 }
+
+const computeDuration = (duration: number) => {
+  const minutes = Math.floor(duration / 60);
+  const seconds = duration % 60;
+  if (minutes > 1) {
+    return `${minutes} mins ${seconds}s`;
+  } else if (minutes === 1) {
+    return `${minutes} min ${seconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
+};
 
 // this should be an env var but oh well
 const apiUrl = "http://127.0.0.1:8000";
@@ -49,7 +61,7 @@ const Chat: React.FC = () => {
       })
         .then((response) => response.json())
         .then((data) => {
-          // console.log("Fetched presentations:", data);            
+          // console.log("Fetched presentations:", data);
           setPresentationList(data.tasks);
         })
         .catch((error) => {
@@ -142,6 +154,7 @@ const Chat: React.FC = () => {
                   : "bg-[#F6F2ED]"
               } outline outline-3 outline-solid outline-[#86AD95] rounded-lg cursor-pointer transition-all hover:outline-slate-500`}
               onClick={() => setFocusedPresentation(presentation)}
+              key={presentation.task_id}
             >
               {presentation.file_name}
             </h3>
@@ -189,13 +202,15 @@ const Chat: React.FC = () => {
               {/* Column 3 */}
               <div className="flex-1 p-[20px] border bg-white text-left flex flex-row justify-between items-start w-[280px] h-[130px] rounded-[12px]">
                 <p className="text-black text-[16px] mb-4 font-normal text-left">
-                  Total hours <br />
+                  Total minutes <br />
                   practiced
                 </p>
                 <p className="text-black text-[70px] mb-4 font-medium text-right">
-                  {presentationList.reduce((acc, curr) => {
-                    return acc + parseFloat(curr.duration);
-                  }, 0) || "-"}
+                  {presentationList.reduce(
+                    (total, presentation) =>
+                      total + parseInt(presentation.duration),
+                    0
+                  ) || "-"}
                 </p>
               </div>
             </div>
@@ -238,7 +253,11 @@ const Chat: React.FC = () => {
                     <div>
                       {new Date(presentation.uploaded_at).toLocaleDateString()}
                     </div>
-                    <div>{presentation.duration} </div>
+                    <div>
+                      {presentation.duration
+                        ? computeDuration(parseInt(presentation.duration))
+                        : "-"}{" "}
+                    </div>
                     <div>{presentation.status}</div>
                   </div>
                 ))}
@@ -246,94 +265,7 @@ const Chat: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="w-full h-flex bg-[#F6F2ED] pt-[35px] pb-[35px] rounded-[20px] outline outline-3 outline-solid outline-[#86AD95] min-h-[50vh]">
-          <div className="p-6 bg-[#F7F4ED] min-h-screen w-[1100px]">
-            {/* Header */}
-            <h1 className="text-[#5A6E58] text-[24px] font-bold mb-6">
-              Tail-wagging feedback, just for you!
-            </h1>
-
-            {/* General Feedback */}
-            <div className="mb-6">
-              <h2 className="text-[#5A6E58] text-[20px] font-medium mb-2">
-                General Feedback
-              </h2>
-              <div className="bg-white rounded-lg border border-[#D7DAC7] p-4">
-                <ul className="list-disc list-inside text-[#5A6E58] text-[16px]">
-                  <li>You sound upset here—try speaking more calmly.</li>
-                  <li>It’s hard to hear this part—speak louder.</li>
-                  <li>Good job! Speak a bit slower here.</li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Audio Transcript */}
-            <div className="mb-6">
-              <h2 className="text-[#5A6E58] text-[20px] font-medium mb-2">
-                Audio Transcript
-              </h2>
-              <div className="bg-white rounded-lg border border-[#D7DAC7] p-4 flex flex-col items-center">
-                {/* Waveform Placeholder */}
-                <div className="w-full h-[50px] bg-[#D7DAC7] rounded-md mb-4 flex justify-center items-center">
-                  {/* Replace this with an audio waveform image or a player */}
-
-                  <img
-                    src={AudioTrans}
-                    className="audiotrans"
-                    alt="audio"
-                    width={800}
-                    height={276}
-                  />
-                </div>
-                {/* Controls */}
-                <div className="flex items-center justify-between w-full">
-                  <p className="text-[#5A6E58] text-[14px]">0:00</p>
-                  <div className="flex gap-2">
-                    <button className="text-[#5A6E58]">⏮</button>
-                    <button className="text-[#5A6E58]">▶</button>
-                    <button className="text-[#5A6E58]">⏭</button>
-                  </div>
-                  <p className="text-[#5A6E58] text-[14px]">0:45</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Highlighted Timestamps */}
-            <div>
-              <h2 className="text-[#5A6E58] text-[20px] font-medium mb-2">
-                Highlighted timestamps
-              </h2>
-              <div className="bg-white rounded-lg border border-[#D7DAC7] p-4 shadow-md">
-                <div className="flex items-start gap-4">
-                  {/* Audio Icon */}
-                  <div className="flex flex-col items-center">
-                    <p className="text-[#5A6E58] text-[14px]">0:23</p>
-                  </div>
-                  {/* Description */}
-                  <div className="flex-1">
-                    <h3 className="text-[#5A6E58] text-[16px] font-medium mb-1">
-                      Too much filler words
-                    </h3>
-                    <p className="text-[#5A6E58] text-[14px]">
-                      The use of filler words such as “um” and “um, um” detracts
-                      from the speaker’s credibility and makes the text seem
-                      less polished.
-                    </p>
-                  </div>
-                </div>
-                {/* Suggestions */}
-                <div className="mt-4 flex gap-2 pl-[40px]">
-                  <button className="bg-[#A4B494] text-white text-[14px] px-4 py-2 rounded-md">
-                    Create an energetic tone
-                  </button>
-                  <button className="bg-[#A4B494] text-white text-[14px] px-4 py-2 rounded-md">
-                    Pause instead of saying “um”
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Feedback presentation={focusedPresentation} />
       )}
 
       {/* New div for File Input, Upload Button, Display Results with background */}
@@ -440,7 +372,7 @@ const Chat: React.FC = () => {
             presentation.task_id === currentTaskId &&
             presentation.status === "processing"
         ) && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <LoadingModal />
           </div>
         )}
