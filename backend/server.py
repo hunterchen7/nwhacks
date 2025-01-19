@@ -1,265 +1,122 @@
-import whisper
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from uuid import uuid4
 import os
 import json
-from scipy.io import wavfile
 from datetime import datetime
-import librosa
-import torch
-from transformers import Wav2Vec2ForSequenceClassification, Wav2Vec2FeatureExtractor, AutoModelForCausalLM, AutoTokenizer
+from threading import Thread
+import shutil
+from ai_scripts import preprocess_audio_pipeline
 
-# Audio Processing Functions
-def load_audio(file_path):
-    """Load the WAV file."""
-    rate, data = wavfile.read(file_path)
-    duration = len(data) / rate
-    print(f"Audio loaded: {file_path} | Sample Rate: {rate} | Duration: {len(data)/rate:.2f} sec")
-    return rate, data, duration
+# FastAPI app instance
+app = FastAPI()
 
-def transcribe_audio(file_path, model_name="base", prompt=None):
-    """Transcribe audio using Whisper with optional custom prompts."""
-    model = whisper.load_model(model_name)
-    print(f"Transcribing audio using Whisper ({model_name} model)...")
-    result = model.transcribe(file_path, initial_prompt=prompt)
-    print("Transcription completed.")
-    return result
+# In-memory task storage
+tasks = {}
 
-def segment_audio_by_timestamps(data, rate, segments, output_dir):
-    """Segment audio using transcription timestamps."""
-    os.makedirs(output_dir, exist_ok=True)
-    segment_files = []
-    for segment in segments:
-        segment_id = segment["id"]
-        start_sample = int(segment["start"] * rate)
-        end_sample = int(segment["end"] * rate)
-        segment_data = data[start_sample:end_sample]
-        output_path = os.path.join(output_dir, f"segment_{segment_id}.wav")
-        wavfile.write(output_path, rate, segment_data.astype(data.dtype))
-        segment_files.append(output_path)
-        print(f"Saved: {output_path}")
-    return segment_files
-
-def save_transcription_to_json(transcription, output_file):
-    """Save transcription result to a JSON file."""
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(transcription, f, ensure_ascii=False, indent=4)
-    print(f"Transcription saved to {output_file}")
-
-def generate_unique_output_dir(base_dir, input_file):
-    """Generate a unique output directory name."""
-    base_name = os.path.splitext(os.path.basename(input_file))[0]
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    unique_dir = os.path.join(base_dir, f"{base_name}_{timestamp}")
-    os.makedirs(unique_dir, exist_ok=True)
-    return unique_dir
-
-def preprocess_audio(file_path, target_sr=16000):
-    """Load audio, convert to mono, and resample to 16 kHz."""
-    y, sr = librosa.load(file_path, sr=target_sr, mono=True)
-    return torch.tensor(y).unsqueeze(0)  # Add batch dimension
-
-# Load the model and processor
-def load_emotion_model():
-    """Load the Hugging Face Wav2Vec2 model for emotion recognition."""
-    model_name = "ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition"
-    model = Wav2Vec2ForSequenceClassification.from_pretrained(model_name)
-    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_name)
-    return model, feature_extractor
-
-def analyze_emotion_with_huggingface(file_path, model, feature_extractor):
-    """Analyze emotions using Hugging Face Wav2Vec2 model."""
-    # Load and preprocess audio
-    y, sr = librosa.load(file_path, sr=16000, mono=True)  # Resample to 16 kHz
-    inputs = feature_extractor(y, sampling_rate=16000, return_tensors="pt", padding=True)
-
-    # Perform inference
-    with torch.no_grad():
-        logits = model(**inputs).logits
-
-    # Get probabilities and predicted emotion
-    probabilities = torch.nn.functional.softmax(logits, dim=-1)[0]
-    
-    predicted_label = torch.argmax(probabilities).item()
-
-    # Emotion labels (specific to this model)
-    emotions = ['angry', 'calm', 'disgust', 'fearful', 'happy', 'neutral', 'sad', 'surprised']
-    # Convert probabilities to a list
-    confidence_scores = probabilities.tolist()    
-    
-    predicted_emotion = emotions[predicted_label]
-
-
-    print(f"Predicted Emotion: {predicted_emotion}")
-    print(f"Confidence Scores: {confidence_scores}")
-
-    return {
-        "predicted_emotion": predicted_emotion,
-        "confidence_scores": confidence_scores
-    }
-    
-def aggregate_feedback(transcription):
-    """Aggregate feedback from all segments into a structured format."""
-    feedback_summary = {
-        "overall_emotions": [],
-        "overall_fillers": 0,
-        "segment_feedback": []
-    }
-
-    for segment in transcription["segments"]:
-        feedback_summary["overall_emotions"].append(segment["emotion_analysis"]["predicted_emotion"])
-        feedback_summary["overall_fillers"] += segment["filler_analysis"]["total_fillers"]
-        feedback_summary["segment_feedback"].append({
-            "segment_id": segment["id"],
-            "text": segment["text"],
-            "emotion": segment["emotion_analysis"]["predicted_emotion"],
-            "fillers": segment["filler_analysis"]["total_fillers"],
-            "filler_percentage": segment["filler_analysis"]["filler_percentage"]
-        })
-
-    # Summarize overall emotions
-    emotion_counts = {emotion: feedback_summary["overall_emotions"].count(emotion) for emotion in set(feedback_summary["overall_emotions"])}
-    feedback_summary["overall_emotions_summary"] = emotion_counts
-
-    return feedback_summary
-
-    
-def load_local_model(model_name="Qwen/Qwen2.5-0.5B-Instruct"):
-    """Load a local instruction-tuned model."""
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")  # Leverage GPU if available
-    return model, tokenizer
-
-def generate_summary_with_local_model(transcription_text, feedback_summary, model, tokenizer):
-    """
-    Generate a concise summary of the transcription text using a local LLM,
-    incorporating filler and emotion analysis.
-    """
-    prompt = f"""
-    You are a extremely concise expert speech coach. Provide feedback on the following presentation transcript directly to me. Focus on:
-
-    - Filler word usage and improvement.
-    - Emotional tone and audience engagement.
-    - Clarity, coherence, and delivery.
-
-    Transcript:
-    {transcription_text}
-
-    Your response must be as concise as possible and under 3 sentences and provide actionable feedback to help me improve delivery. 
-
-    ### Analysis:
-    """
-
-    # Tokenize and generate output
-    inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to("cuda")
-    outputs = model.generate(
-        inputs["input_ids"],
-        no_repeat_ngram_size=3,
-        max_length=1024,
-        num_beams=3,
-    )
-
-    # Decode and clean the output
-    summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    
-    print('pre-cutoff summary: ', summary)
-
-    # Remove any prompt-like content from the output
-    if "### Analysis:" in summary:
-        summary = summary.split("### Analysis:")[-1].strip()
+# Utility function to save and process files
+def save_and_process_audio(uploadedFile: UploadFile, task_id: str):
+    """Save uploaded file and start processing."""
+    print(f"Saving and processing audio for task {task_id} with file {uploadedFile.filename}")
+    try:
+        # Save the file
+        file_path = f"uploads/{task_id}_{uploadedFile.filename}"
+        os.makedirs("uploads", exist_ok=True)
+        print("creating file on disk")
         
-    summary = summary.split("\n\n")[0].strip()  # Only keep the first paragraph
+        # Write file content to disk directly from UploadFile
+        with open(file_path, "wb") as f:
+            print("Writing file to disk...")
+            shutil.copyfileobj(uploadedFile.file, f)
+        print(f"File saved successfully: {file_path}")
 
-    return summary
+        # Reset file pointer after reading (important if you need to read again later)
+        uploadedFile.file.seek(0)
 
+        # Start the processing pipeline
+        print(f"Starting preprocess_audio_pipeline for task {task_id}")
+        output_dir = preprocess_audio_pipeline(
+            input_file=file_path,
+            base_output_dir="transcriptions",
+            model_name="base",
+            prompt="uh, um, ah, like, you know, well, hmm, uh-huh, okay..."
+        )
+        print(f"Finished preprocess_audio_pipeline for task {task_id}, output_dir: {output_dir}")
 
-import re
-def analyze_filler_words(transcript, filler_words=None):
-    """
-    Analyze the transcript to detect and count filler words.
-    Args:
-        transcript (str): The transcribed text from the audio segment.
-        filler_words (list): List of filler words to detect.
-    Returns:
-        dict: A dictionary with filler word counts and their percentage.
-    """
-    if filler_words is None:
-        filler_words = ["uh", "um", "ah", "like", "you know", "well", "hmm"]
+        # Save results to tasks
+        with open(f"{output_dir}/analysis_results.json", "r", encoding="utf-8") as result_file:
+            tasks[task_id]["status"] = "completed"
+            tasks[task_id]["results"] = json.load(result_file)
+        print(f"Task {task_id} completed successfully")
 
-    # Normalize text
-    transcript = transcript.lower()
-    words = re.findall(r'\b\w+\b', transcript)  # Tokenize words
-    total_words = len(words)
+    except Exception as e:
+        print(f"Error in processing task {task_id}: {str(e)}")
+        tasks[task_id]["status"] = "failed"
+        tasks[task_id]["error"] = str(e)
 
-    # Count filler words
-    filler_counts = {word: transcript.count(word) for word in filler_words}
-    total_fillers = sum(filler_counts.values())
+    finally:
+        # Explicitly close the UploadFile object
+        uploadedFile.file.close()
 
-    # Calculate percentage
-    filler_percentage = (total_fillers / total_words) * 100 if total_words > 0 else 0
-
-    return {
-        "filler_counts": filler_counts,
-        "total_fillers": total_fillers,
-        "filler_percentage": filler_percentage,
+# Endpoint: Upload File
+@app.post("/upload")
+async def upload_audio(file: UploadFile = File(...)):
+    """Upload an audio file and start processing."""    
+    task_id = str(uuid4())
+    tasks[task_id] = {
+        "status": "processing",
+        "file_name": file.filename,
+        "results": None,
+        "uploaded_at": datetime.now().isoformat(),
     }
-    
-def preprocess_audio_pipeline(input_file, base_output_dir, model_name="base", prompt=None):
-    """Complete transcription and text analysis pipeline."""
-    output_dir = generate_unique_output_dir(base_output_dir, input_file)
-    rate, data, duration = load_audio(input_file)
-    upload_time = datetime.now().isoformat()
 
-    # Transcribe the audio
-    transcription = transcribe_audio(input_file, model_name=model_name, prompt=prompt)
+    # Offload processing to a thread
+    Thread(target=save_and_process_audio, args=(file, task_id)).start()
 
-    # Segment audio and analyze emotions/fillers
-    segment_files = segment_audio_by_timestamps(data, rate, transcription["segments"], output_dir)
-    emotion_model, feature_extractor = load_emotion_model()
+    return {"task_id": task_id, "status": "processing"}
 
-    for segment_file, segment in zip(segment_files, transcription["segments"]):
-        print(f"Analyzing Segment {segment['id']}...")
+# Endpoint: Fetch Analysis
+@app.get("/fetch-analysis/{task_id}")
+async def fetch_analysis(task_id: str):
+    """Fetch analysis results for a specific task."""
+    if task_id not in tasks:
+        raise HTTPException(status_code=404, detail="Task ID not found")
+    task = tasks[task_id]
+    if task["status"] == "completed":
+        return {"status": "completed", "results": task["results"]}
+    elif task["status"] == "failed":
+        return {"status": "failed", "error": task["error"]}
+    else:
+        return {"status": task["status"]}
 
-        # Emotion and filler analysis
-        segment["emotion_analysis"] = analyze_emotion_with_huggingface(segment_file, emotion_model, feature_extractor)
-        segment["filler_analysis"] = analyze_filler_words(segment["text"])
+# Endpoint: List All Analyses
+@app.get("/all-analyses")
+async def all_analyses():
+    """List all analysis tasks."""
+    return {"tasks": tasks}
 
-    # Aggregate feedback for metrics
-    feedback_summary = aggregate_feedback(transcription)
+# Endpoint: Delete File
+@app.delete("/delete-file/{task_id}")
+async def delete_file(task_id: str):
+    """Delete a file and its associated results."""
+    if task_id not in tasks:
+        raise HTTPException(status_code=404, detail="Task ID not found")
 
-    # Load the local LLM for full-text analysis
-    print("\nLoading local instruction-tuned LLM...")
-    local_model, local_tokenizer = load_local_model(model_name="HuggingFaceTB/SmolLM2-360M-Instruct")
+    # Remove task
+    task = tasks.pop(task_id)
 
-    # Generate summary using aggregated feedback and transcription text
-    print("\nGenerating summarized presentation feedback...")
-    summarized_feedback = generate_summary_with_local_model(transcription["text"], feedback_summary, local_model, local_tokenizer)
-    print("\nSummarized Feedback:", summarized_feedback)
-    transcription["summarized_feedback"] = summarized_feedback
-    
-    transcription["duration"] = duration
-    transcription["uploaded_at"] = upload_time
+    # Delete associated file
+    file_path = f"uploads/{task_id}_{task['file_name']}"
+    if os.path.exists(file_path):
+        os.remove(file_path)
 
-    # Save the updated transcription with all metadata
-    merged_results_file = os.path.join(output_dir, "analysis_results.json")
-    with open(merged_results_file, "w", encoding="utf-8") as f:
-        json.dump(transcription, f, ensure_ascii=False, indent=4)
-    print(f"Analysis results saved to {merged_results_file}")
+    # Delete analysis results directory
+    output_dir = f"transcriptions/{task_id}"
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
 
-    return output_dir
+    return {"status": "success", "message": f"Task {task_id} deleted successfully"}
 
-
-# Run the pipeline
+# Start FastAPI Server with Uvicorn
 if __name__ == "__main__":
-    base_output_directory = "transcriptions"
-    os.makedirs(base_output_directory, exist_ok=True)
-
-    # Example: Process a new file
-    input_audio = "bernie.wav"
-    # Custom prompts to filter influencies back in
-    custom_prompt = "uh, um, ah, like, you know, well, hmm, uh-huh, okay..."
-    output_dir = preprocess_audio_pipeline(
-        input_file=input_audio,
-        base_output_dir=base_output_directory,
-        model_name="base",
-        prompt=custom_prompt
-    )
-    print(f"Audio segments saved in: {output_dir}")
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
