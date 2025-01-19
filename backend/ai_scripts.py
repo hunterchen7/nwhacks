@@ -136,7 +136,7 @@ def generate_summary_with_local_model(transcription_text, feedback_summary, mode
     prompt = f"""
     You are a extremely concise expert speech coach. Provide feedback on the following presentation transcript directly to me. Focus on:
 
-    - Filler word usage and improvement.
+    - Filler word (e.g. um, like, uh, etc) usage and improvements
     - Emotional tone and audience engagement.
     - Clarity, coherence, and delivery.
 
