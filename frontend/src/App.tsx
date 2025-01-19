@@ -23,32 +23,7 @@ function App() {
 
 
 
-<div className="flex-1 border pl-[20px] pr-[20px] pt-[10px] pb-[10px] bg-white text-left flex flex-row justify-between items-start w-100 h-[111px] rounded-[12px] gap-4 items-center justify-start">
 
-              <img
-                src={DogLogo}
-                className="logo"
-                alt="Dog logo"
-                width={80}
-                height={80}
-              />
-              
-              <p className="text-black text-[20px] mb-4 font-medium text-left">
-                Filler Words
-              </p>
-              <p className="text-black text-[20px] mb-4 font-medium text-right">
-                10
-              </p>
-
-
-              <img
-                src={DogLogo}
-                className="logo"
-                alt="Dog logo"
-                width={40}
-                height={40}
-              />
-            </div>
     </main>
   );
 }
