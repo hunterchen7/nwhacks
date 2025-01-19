@@ -69,6 +69,22 @@ const Chat: React.FC = () => {
     return () => clearInterval(intervalId);
   }, []);
 
+  useEffect(() => {
+    // Automatically open the uploaded file when it's completed
+    if (currentTaskId) {
+      const updatedPresentation = presentationList.find(
+        (presentation) =>
+          presentation.task_id === currentTaskId &&
+          presentation.status === "completed"
+      );
+      if (updatedPresentation && !presentationContains(updatedPresentation)) {
+        setOpenPresentations([updatedPresentation, ...openPresentations]);
+        setFocusedPresentation(updatedPresentation);
+        setCurrentTaskId(null); // Reset currentTaskId after handling
+      }
+    }
+  }, [presentationList, currentTaskId]); // Runs whenever presentationList or currentTaskId changes
+
   const handleUpload = async () => {
     if (!file) {
       alert("Please select a file first.");
